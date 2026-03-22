@@ -4,12 +4,12 @@ import sys
 from pathlib import Path
 
 try:
-    from integration.code import crew, inventory, registration
+    from integration.code import crew, inventory, race, registration
 except ImportError:
     repo_root = Path(__file__).resolve().parents[2]
     if str(repo_root) not in sys.path:
         sys.path.insert(0, str(repo_root))
-    from integration.code import crew, inventory, registration
+    from integration.code import crew, inventory, race, registration
 
 
 def _prompt_non_empty(prompt: str) -> str:
@@ -240,6 +240,108 @@ def _inventory_flow() -> None:
             print(f"Inventory action failed: {exc}")
 
 
+def _race_flow() -> None:
+    while True:
+        print("\nRace Management")
+        print("1. Create race")
+        print("2. List races")
+        print("3. View race details")
+        print("4. Add race entry")
+        print("5. Remove race entry")
+        print("6. Clear all races")
+        print("0. Back")
+
+        choice = input("Choose race option: ").strip()
+        if choice == "0":
+            return
+
+        try:
+            if choice == "1":
+                name = input("Enter race name: ").strip()
+                prize_pool = int(input("Enter prize pool (>=0): ").strip())
+                race_id = race.create_race(name=name, prize_pool=prize_pool)
+                print(f"Race created. ID: {race_id}")
+
+            elif choice == "2":
+                races = race.list_races()
+                if not races:
+                    print("No races created yet.")
+                else:
+                    print("Races:")
+                    for idx, r in enumerate(races, start=1):
+                        print(
+                            f"{idx}. ID: {r['id']} | Name: {r['name']} | "
+                            f"Entries: {len(r['entries'])} | Prize: {r['prize_pool']}"
+                        )
+
+            elif choice == "3":
+                race_id = input("Enter race ID: ").strip()
+                r = race.get_race(race_id)
+                if r is None:
+                    print("Race not found.")
+                else:
+                    print(f"Race: {r['name']} | Status: {r['status']} | Prize: {r['prize_pool']}")
+                    if not r["entries"]:
+                        print("No entries yet.")
+                    else:
+                        print("Entries:")
+                        for i, entry in enumerate(r["entries"], start=1):
+                            print(
+                                f"{i}. Driver: {entry.driver.name} ({entry.driver.id}) | "
+                                f"Car: {entry.car.model} ({entry.car.id})"
+                            )
+
+            elif choice == "4":
+                race_id = input("Enter race ID: ").strip()
+                driver_id = input("Enter driver member ID: ").strip()
+                car_id = input("Enter car ID: ").strip()
+                note = input("Optional note: ").strip() or None
+
+                # Interaction rules at integration layer:
+                # - driver must be registered and role must be 'driver'
+                # - car must exist in inventory
+                member = registration.get_member(driver_id)
+                if member is None:
+                    print("Entry failed: member not found. Register member first.")
+                    continue
+                if member.role != "driver":
+                    print("Entry failed: only members with role 'driver' can enter races.")
+                    continue
+
+                car = inventory.get_car(car_id)
+                if car is None:
+                    print("Entry failed: car not found in inventory.")
+                    continue
+                if car.condition == "retired":
+                    print("Entry failed: retired cars cannot be entered.")
+                    continue
+
+                race.add_entry(race_id=race_id, driver=member, car=car, note=note)
+                print("Race entry added.")
+
+            elif choice == "5":
+                race_id = input("Enter race ID: ").strip()
+                driver_id = input("Enter driver member ID to remove: ").strip()
+                race.remove_entry(race_id, driver_id)
+                print("Race entry removed.")
+
+            elif choice == "6":
+                confirm = input("Clear all races? (y/N): ").strip().lower()
+                if confirm == "y":
+                    race.clear_races()
+                    print("All races cleared.")
+                else:
+                    print("Cancelled.")
+
+            else:
+                print("Invalid race option.")
+
+        except ValueError as exc:
+            print(f"Race action failed: {exc}")
+        except KeyError as exc:
+            print(f"Race action failed: {exc}")
+
+
 def run() -> None:
     actions: Dict[str, Callable[[], None]] = {
         "1": _register_member_flow,
@@ -250,10 +352,11 @@ def run() -> None:
         "6": _change_member_skill_flow,
         "7": _view_member_skill_flow,
         "8": _inventory_flow,
+        "9": _race_flow,
     }
 
     while True:
-        print("\nStreetRace Manager - Integration Phase 3 (Registration + Crew + Inventory)")
+        print("\nStreetRace Manager - Integration Phase 4 (Registration + Crew + Inventory + Race)")
         print("1. Register member")
         print("2. List members")
         print("3. Get member by ID")
@@ -262,6 +365,7 @@ def run() -> None:
         print("6. Change member skill level")
         print("7. View member skill level")
         print("8. Inventory management")
+        print("9. Race management")
         print("0. Exit")
 
         choice = input("Choose an option: ").strip()
