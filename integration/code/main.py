@@ -4,12 +4,12 @@ import sys
 from pathlib import Path
 
 try:
-    from integration.code import crew, inventory, race, registration, results
+    from integration.code import crew, inventory, mission, race, registration, results
 except ImportError:
     repo_root = Path(__file__).resolve().parents[2]
     if str(repo_root) not in sys.path:
         sys.path.insert(0, str(repo_root))
-    from integration.code import crew, inventory, race, registration, results
+    from integration.code import crew, inventory, mission, race, registration, results
 
 
 def _prompt_non_empty(prompt: str) -> str:
@@ -463,6 +463,149 @@ def _results_flow() -> None:
             print(f"Results action failed: {exc}")
 
 
+def _available_roles_for_mission(m: Dict) -> list[str]:
+    """Return available roles for mission checks.
+
+    If assignees are provided, use their roles only. Otherwise use all registered roles.
+    """
+    assignee_ids = m.get("assignee_ids", [])
+    if assignee_ids:
+        roles = []
+        for aid in assignee_ids:
+            member = registration.get_member(str(aid))
+            if member is not None:
+                roles.append(member.role)
+        return roles
+    return [member.role for member in registration.list_members()]
+
+
+def _assignee_display_names(m: Dict) -> list[str]:
+    assignee_ids = m.get("assignee_ids", [])
+    labels: list[str] = []
+    for aid in assignee_ids:
+        member = registration.get_member(str(aid))
+        if member is None:
+            labels.append(f"unknown ({aid})")
+        else:
+            labels.append(f"{member.name} ({member.id})")
+    return labels
+
+
+def _mission_flow() -> None:
+    while True:
+        print("\nMission Planning")
+        print("1. Create mission")
+        print("2. List missions")
+        print("3. View mission details")
+        print("4. Assign mission crew")
+        print("5. Evaluate mission readiness")
+        print("6. Start mission")
+        print("7. Complete mission")
+        print("8. Clear all missions")
+        print("0. Back")
+
+        choice = input("Choose mission option: ").strip()
+        if choice == "0":
+            return
+
+        try:
+            if choice == "1":
+                mission_type = input("Enter mission type (delivery/planning/repair/rescue): ").strip()
+                title = input("Enter mission title: ").strip()
+                mission_id = mission.create_mission(mission_type=mission_type, title=title)
+                print(f"Mission created. ID: {mission_id}")
+
+            elif choice == "2":
+                missions = mission.list_missions()
+                if not missions:
+                    print("No missions planned yet.")
+                else:
+                    print("Missions:")
+                    for idx, m in enumerate(missions, start=1):
+                        assignees = _assignee_display_names(m)
+                        print(
+                            f"{idx}. ID: {m['id']} | Type: {m['type']} | Title: {m['title']} | "
+                            f"Status: {m['status']} | Required: {', '.join(m['required_roles']) or 'none'} | "
+                            f"Assignees: {', '.join(assignees) or 'none'}"
+                        )
+
+            elif choice == "3":
+                mission_id = input("Enter mission ID: ").strip()
+                m = mission.get_mission(mission_id)
+                if m is None:
+                    print("Mission not found.")
+                else:
+                    assignees = _assignee_display_names(m)
+                    print(
+                        f"Mission: {m['title']} | Type: {m['type']} | Status: {m['status']} | "
+                        f"Required roles: {', '.join(m['required_roles']) or 'none'}"
+                    )
+                    print(f"Assignees: {', '.join(assignees) or 'none'}")
+
+            elif choice == "4":
+                mission_id = input("Enter mission ID: ").strip()
+                ids_input = input("Enter assignee member IDs (comma-separated): ").strip()
+                assignee_ids = [x.strip() for x in ids_input.split(",") if x.strip()]
+
+                # Integration check: assignees must exist as registered members.
+                missing = [aid for aid in assignee_ids if registration.get_member(aid) is None]
+                if missing:
+                    print(f"Assign failed: unknown member IDs: {', '.join(missing)}")
+                    continue
+
+                updated = mission.assign_mission(mission_id, assignee_ids)
+                assignees = _assignee_display_names(updated)
+                print(f"Mission assigned. Assignees: {', '.join(assignees) or 'none'}")
+
+            elif choice == "5":
+                mission_id = input("Enter mission ID: ").strip()
+                m = mission.get_mission(mission_id)
+                if m is None:
+                    print("Mission not found.")
+                    continue
+                available_roles = _available_roles_for_mission(m)
+                check = mission.evaluate_mission_readiness(mission_id, available_roles)
+                if check["can_start"]:
+                    print("Mission is READY.")
+                else:
+                    print(f"Mission is BLOCKED: {check['reason']}")
+
+            elif choice == "6":
+                mission_id = input("Enter mission ID: ").strip()
+                m = mission.get_mission(mission_id)
+                if m is None:
+                    print("Mission not found.")
+                    continue
+                available_roles = _available_roles_for_mission(m)
+                result = mission.start_mission(mission_id, available_roles)
+                if not result.get("started", False):
+                    print(f"Mission start blocked: {result.get('reason', 'unknown reason')}")
+                else:
+                    print("Mission started successfully.")
+
+            elif choice == "7":
+                mission_id = input("Enter mission ID: ").strip()
+                outcome = input("Enter mission outcome: ").strip() or "success"
+                done = mission.complete_mission(mission_id, outcome)
+                print(f"Mission completed with outcome: {done.get('outcome', outcome)}")
+
+            elif choice == "8":
+                confirm = input("Clear all missions? (y/N): ").strip().lower()
+                if confirm == "y":
+                    mission.clear_missions()
+                    print("All missions cleared.")
+                else:
+                    print("Cancelled.")
+
+            else:
+                print("Invalid mission option.")
+
+        except ValueError as exc:
+            print(f"Mission action failed: {exc}")
+        except KeyError as exc:
+            print(f"Mission action failed: {exc}")
+
+
 def run() -> None:
     actions: Dict[str, Callable[[], None]] = {
         "1": _register_member_flow,
@@ -475,10 +618,11 @@ def run() -> None:
         "8": _inventory_flow,
         "9": _race_flow,
         "10": _results_flow,
+        "11": _mission_flow,
     }
 
     while True:
-        print("\nStreetRace Manager - Integration Phase 5 (Registration + Crew + Inventory + Race + Results)")
+        print("\nStreetRace Manager - Integration Phase 6 (Registration + Crew + Inventory + Race + Results + Mission)")
         print("1. Register member")
         print("2. List members")
         print("3. Get member by ID")
@@ -489,6 +633,7 @@ def run() -> None:
         print("8. Inventory management")
         print("9. Race management")
         print("10. Results management")
+        print("11. Mission planning")
         print("0. Exit")
 
         choice = input("Choose an option: ").strip()

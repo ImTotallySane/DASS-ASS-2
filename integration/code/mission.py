@@ -28,20 +28,15 @@ def _default_roles_for_type(mission_type: str) -> List[str]:
 def create_mission(
     mission_type: str,
     title: str,
-    has_damaged_car: bool = False,
 ) -> str:
     """Create a mission and return mission id.
 
     Required roles are always derived from mission type defaults.
-    If `has_damaged_car` is True, mechanic requirement is auto-enforced.
     """
     mtype = _normalize_text(mission_type, "mission_type").lower()
     mtitle = _normalize_text(title, "title")
 
     roles = _default_roles_for_type(mtype)
-
-    if has_damaged_car and "mechanic" not in roles:
-        roles.append("mechanic")
 
     mission_id = uuid.uuid4().hex
     _missions[mission_id] = {
@@ -49,7 +44,6 @@ def create_mission(
         "type": mtype,
         "title": mtitle,
         "required_roles": sorted(set(roles)),
-        "has_damaged_car": bool(has_damaged_car),
         "status": "planned",
         "assignee_ids": [],
     }
