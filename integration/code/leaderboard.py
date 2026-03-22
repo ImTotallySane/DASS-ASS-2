@@ -57,7 +57,7 @@ def top_racers(racers_stats: Dict[str, Dict], n: int = 10, by: str = "points") -
     """Return top N racers sorted descending by the provided key."""
     if n < 0:
         raise ValueError("n must be >= 0")
-    if by not in {"points", "wins", "total_earnings", "races", "podiums"}:
+    if by not in {"points", "wins", "total_earnings"}:
         raise ValueError(f"unsupported sort key: {by}")
 
     items = list_racers(racers_stats).values()
@@ -69,7 +69,7 @@ def top_gamblers(gamblers_stats: Dict[str, Dict], n: int = 10, by: str = "net_pr
     """Return top N gamblers sorted descending by the provided key."""
     if n < 0:
         raise ValueError("n must be >= 0")
-    if by not in {"net_profit", "wins", "total_payouts", "total_bets", "total_staked"}:
+    if by not in {"net_profit", "wins", "total_payouts"}:
         raise ValueError(f"unsupported sort key: {by}")
 
     items = list_gamblers(gamblers_stats).values()

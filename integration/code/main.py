@@ -4,12 +4,191 @@ import sys
 from pathlib import Path
 
 try:
-    from integration.code import crew, gambling, inventory, mission, race, registration, results
+    from integration.code import crew, gambling, inventory, leaderboard, mission, race, registration, results
 except ImportError:
     repo_root = Path(__file__).resolve().parents[2]
     if str(repo_root) not in sys.path:
         sys.path.insert(0, str(repo_root))
-    from integration.code import crew, gambling, inventory, mission, race, registration, results
+    from integration.code import crew, gambling, inventory, leaderboard, mission, race, registration, results
+
+
+_racers_stats: Dict[str, Dict] = {}
+_gamblers_stats: Dict[str, Dict] = {}
+
+
+def _ensure_racer_stats(driver_id: str) -> Dict:
+    member = registration.get_member(driver_id)
+    existing = _racers_stats.get(driver_id)
+    if existing is not None:
+        if member is not None:
+            existing["driver_name"] = member.name
+        return existing
+
+    row = {
+        "driver_id": driver_id,
+        "driver_name": member.name if member is not None else driver_id,
+        "races": 0,
+        "wins": 0,
+        "podiums": 0,
+        "points": 0,
+        "total_earnings": 0,
+    }
+    _racers_stats[driver_id] = row
+    return row
+
+
+def _ensure_gambler_stats(bettor_id: str) -> Dict:
+    member = registration.get_member(bettor_id)
+    existing = _gamblers_stats.get(bettor_id)
+    if existing is not None:
+        if member is not None:
+            existing["bettor_name"] = member.name
+        return existing
+
+    row = {
+        "bettor_id": bettor_id,
+        "bettor_name": member.name if member is not None else bettor_id,
+        "total_bets": 0,
+        "total_staked": 0,
+        "total_payouts": 0,
+        "wins": 0,
+        "net_profit": 0,
+    }
+    _gamblers_stats[bettor_id] = row
+    return row
+
+
+def _update_racer_stats_from_results(rows: list[Dict]) -> None:
+    # Standard points table (top-10): 25,18,15,12,10,8,6,4,2,1
+    points_by_position = {1: 25, 2: 18, 3: 15, 4: 12, 5: 10, 6: 8, 7: 6, 8: 4, 9: 2, 10: 1}
+    for row in rows:
+        driver_id = str(row.get("driver_id", "")).strip()
+        if not driver_id:
+            continue
+        position = int(row.get("position", 0) or 0)
+        payout = int(row.get("payout", 0) or 0)
+        stats = _ensure_racer_stats(driver_id)
+        stats["races"] += 1
+        if position == 1:
+            stats["wins"] += 1
+        if 1 <= position <= 3:
+            stats["podiums"] += 1
+        stats["points"] += points_by_position.get(position, 0)
+        stats["total_earnings"] += payout
+
+
+def _update_gambler_stats_on_bet_placed(bettor_id: str, amount: int) -> None:
+    stats = _ensure_gambler_stats(bettor_id)
+    stats["total_bets"] += 1
+    stats["total_staked"] += amount
+    stats["net_profit"] = int(stats.get("total_payouts", 0) or 0) - int(stats.get("total_staked", 0) or 0)
+
+
+def _update_gambler_stats_on_settlement(settlement_rows: list[Dict]) -> None:
+    for row in settlement_rows:
+        bettor_id = str(row.get("bettor_id", "")).strip()
+        if not bettor_id:
+            continue
+        payout = int(row.get("payout", 0) or 0)
+        won = bool(row.get("won", False))
+        stats = _ensure_gambler_stats(bettor_id)
+        stats["total_payouts"] += payout
+        if won:
+            stats["wins"] += 1
+        stats["net_profit"] = int(stats.get("total_payouts", 0) or 0) - int(stats.get("total_staked", 0) or 0)
+
+
+def _leaderboard_flow() -> None:
+    while True:
+        print("\nLeaderboard")
+        print("1. Top racers")
+        print("2. Top gamblers")
+        print("3. View racer stats by driver ID")
+        print("4. View gambler stats by bettor ID")
+        print("5. Clear leaderboard stats")
+        print("0. Back")
+
+        choice = input("Choose leaderboard option: ").strip()
+        if choice == "0":
+            return
+
+        try:
+            if choice == "1":
+                by = input("Sort by (points/wins/total_earnings) [points]: ").strip() or "points"
+                n_raw = input("How many rows [10]: ").strip() or "10"
+                n = int(n_raw)
+                rows = leaderboard.top_racers(_racers_stats, n=n, by=by)
+                if not rows:
+                    print("No racer stats yet.")
+                    continue
+                print("Top racers:")
+                for idx, row in enumerate(rows, start=1):
+                    print(
+                        f"{idx}. {row.get('driver_name')} ({row.get('driver_id')}) | "
+                        f"Points: {row.get('points', 0)} | Wins: {row.get('wins', 0)} | "
+                        f"Podiums: {row.get('podiums', 0)} | Races: {row.get('races', 0)} | "
+                        f"Earnings: {row.get('total_earnings', 0)}"
+                    )
+
+            elif choice == "2":
+                by = input("Sort by (net_profit/wins/total_payouts) [net_profit]: ").strip() or "net_profit"
+                n_raw = input("How many rows [10]: ").strip() or "10"
+                n = int(n_raw)
+                rows = leaderboard.top_gamblers(_gamblers_stats, n=n, by=by)
+                if not rows:
+                    print("No gambler stats yet.")
+                    continue
+                print("Top gamblers:")
+                for idx, row in enumerate(rows, start=1):
+                    print(
+                        f"{idx}. {row.get('bettor_name')} ({row.get('bettor_id')}) | "
+                        f"Net: {row.get('net_profit', 0)} | Wins: {row.get('wins', 0)} | "
+                        f"Staked: {row.get('total_staked', 0)} | Payouts: {row.get('total_payouts', 0)} | "
+                        f"Bets: {row.get('total_bets', 0)}"
+                    )
+
+            elif choice == "3":
+                driver_id = input("Enter driver member ID: ").strip()
+                row = leaderboard.get_racer_stats(_racers_stats, driver_id)
+                if row is None:
+                    print("No racer stats found for this driver.")
+                else:
+                    print(
+                        f"Driver: {row.get('driver_name')} ({row.get('driver_id')}) | "
+                        f"Points: {row.get('points', 0)} | Wins: {row.get('wins', 0)} | "
+                        f"Podiums: {row.get('podiums', 0)} | Races: {row.get('races', 0)} | "
+                        f"Earnings: {row.get('total_earnings', 0)}"
+                    )
+
+            elif choice == "4":
+                bettor_id = input("Enter bettor member ID: ").strip()
+                row = leaderboard.get_gambler_stats(_gamblers_stats, bettor_id)
+                if row is None:
+                    print("No gambler stats found for this bettor.")
+                else:
+                    print(
+                        f"Bettor: {row.get('bettor_name')} ({row.get('bettor_id')}) | "
+                        f"Net: {row.get('net_profit', 0)} | Wins: {row.get('wins', 0)} | "
+                        f"Staked: {row.get('total_staked', 0)} | Payouts: {row.get('total_payouts', 0)} | "
+                        f"Bets: {row.get('total_bets', 0)}"
+                    )
+
+            elif choice == "5":
+                confirm = input("Clear all leaderboard stats? (y/N): ").strip().lower()
+                if confirm == "y":
+                    _racers_stats.clear()
+                    _gamblers_stats.clear()
+                    print("Leaderboard stats cleared.")
+                else:
+                    print("Cancelled.")
+
+            else:
+                print("Invalid leaderboard option.")
+
+        except ValueError as exc:
+            print(f"Leaderboard action failed: {exc}")
+        except KeyError as exc:
+            print(f"Leaderboard action failed: {exc}")
 
 
 def _prompt_non_empty(prompt: str) -> str:
@@ -410,6 +589,7 @@ def _results_flow() -> None:
                     member = registration.get_member(str(row.get("driver_id", "")))
                     if member is not None:
                         member.money += int(row.get("payout", 0) or 0)
+                _update_racer_stats_from_results(rows)
 
                 # Business rule: deduct prize pool from inventory cash.
                 new_balance = inventory.adjust_cash(-total_payout)
@@ -651,6 +831,7 @@ def _gambling_flow() -> None:
 
                 bet = gambling.place_bet(race_id=race_id, bettor=bettor, racer_id=racer_id, amount=amount)
                 bettor.money -= amount
+                _update_gambler_stats_on_bet_placed(bettor.id, amount)
                 print(
                     f"Bet placed. Bettor: {bet['bettor_name']} | Racer: {bet['racer_id']} | "
                     f"Amount: {bet['amount']}"
@@ -706,6 +887,7 @@ def _gambling_flow() -> None:
                     winner = registration.get_member(str(row.get("bettor_id", "")))
                     if winner is not None:
                         winner.money += payout
+                _update_gambler_stats_on_settlement(settlement.get("results", []))
 
                 print(
                     f"Bets settled. Pool: {settlement['pool']} | "
@@ -749,10 +931,11 @@ def run() -> None:
         "10": _results_flow,
         "11": _mission_flow,
         "12": _gambling_flow,
+        "13": _leaderboard_flow,
     }
 
     while True:
-        print("\nStreetRace Manager - Integration Phase 7 (Registration + Crew + Inventory + Race + Results + Mission + Gambling)")
+        print("\nStreetRace Manager (Pls extend deadline)")
         print("1. Register member")
         print("2. List members")
         print("3. Get member by ID")
@@ -765,6 +948,7 @@ def run() -> None:
         print("10. Results management")
         print("11. Mission planning")
         print("12. Gambling")
+        print("13. Leaderboard")
         print("0. Exit")
 
         choice = input("Choose an option: ").strip()
