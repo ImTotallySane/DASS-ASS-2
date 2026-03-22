@@ -4,12 +4,12 @@ import sys
 from pathlib import Path
 
 try:
-    from integration.code import crew, inventory, mission, race, registration, results
+    from integration.code import crew, gambling, inventory, mission, race, registration, results
 except ImportError:
     repo_root = Path(__file__).resolve().parents[2]
     if str(repo_root) not in sys.path:
         sys.path.insert(0, str(repo_root))
-    from integration.code import crew, inventory, mission, race, registration, results
+    from integration.code import crew, gambling, inventory, mission, race, registration, results
 
 
 def _prompt_non_empty(prompt: str) -> str:
@@ -606,6 +606,135 @@ def _mission_flow() -> None:
             print(f"Mission action failed: {exc}")
 
 
+def _gambling_flow() -> None:
+    while True:
+        print("\nGambling")
+        print("1. Place bet")
+        print("2. List bets for race")
+        print("3. View pool for race")
+        print("4. Settle bets")
+        print("5. Clear bets for race")
+        print("6. Clear all bets")
+        print("0. Back")
+
+        choice = input("Choose gambling option: ").strip()
+        if choice == "0":
+            return
+
+        try:
+            if choice == "1":
+                race_id = input("Enter race ID: ").strip()
+                bettor_id = input("Enter bettor member ID: ").strip()
+                racer_id = input("Enter racer (driver) member ID: ").strip()
+                amount = int(input("Enter bet amount: ").strip())
+
+                race_data = race.get_race(race_id)
+                if race_data is None:
+                    print("Bet failed: race not found.")
+                    continue
+
+                # Ensure racer is actually entered in that race.
+                entry_driver_ids = {e.driver.id for e in race_data.get("entries", [])}
+                if racer_id not in entry_driver_ids:
+                    print("Bet failed: racer is not an entry in this race.")
+                    continue
+
+                bettor = registration.get_member(bettor_id)
+                if bettor is None:
+                    print("Bet failed: bettor not found.")
+                    continue
+
+                # Integration-level wallet handling: lock stake at placement time.
+                if bettor.money < amount:
+                    print("Bet failed: bettor does not have enough money.")
+                    continue
+
+                bet = gambling.place_bet(race_id=race_id, bettor=bettor, racer_id=racer_id, amount=amount)
+                bettor.money -= amount
+                print(
+                    f"Bet placed. Bettor: {bet['bettor_name']} | Racer: {bet['racer_id']} | "
+                    f"Amount: {bet['amount']}"
+                )
+
+            elif choice == "2":
+                race_id = input("Enter race ID: ").strip()
+                bets = gambling.list_bets(race_id)
+                if not bets:
+                    print("No bets for this race.")
+                else:
+                    print("Bets:")
+                    for idx, b in enumerate(bets, start=1):
+                        print(
+                            f"{idx}. Bettor: {b['bettor_name']} ({b['bettor_id']}) | "
+                            f"Racer: {b['racer_id']} | Amount: {b['amount']} | Status: {b['status']}"
+                        )
+
+            elif choice == "3":
+                race_id = input("Enter race ID: ").strip()
+                print(f"Total pool: {gambling.total_pool(race_id)}")
+
+            elif choice == "4":
+                race_id = input("Enter race ID: ").strip()
+                bets = gambling.list_bets(race_id)
+                if not bets:
+                    print("Settle failed: no bets found for this race.")
+                    continue
+                if any(b.get("status") == "settled" for b in bets):
+                    print("Settle failed: bets for this race are already settled.")
+                    continue
+
+                race_results = results.get_results(race_id)
+                if not race_results:
+                    print("Settle failed: race results not found. Record results before settling bets.")
+                    continue
+
+                # Winner is derived from recorded race results (position 1).
+                winner_row = next((r for r in race_results if int(r.get("position", 0) or 0) == 1), None)
+                if winner_row is None:
+                    print("Settle failed: race results are invalid (no first-place driver).")
+                    continue
+                winning_racer_id = str(winner_row.get("driver_id", "")).strip()
+                if not winning_racer_id:
+                    print("Settle failed: race results are invalid (missing winner driver id).")
+                    continue
+
+                settlement = gambling.settle_bets(race_id, winning_racer_id)
+                for row in settlement.get("results", []):
+                    payout = int(row.get("payout", 0) or 0)
+                    if payout <= 0:
+                        continue
+                    winner = registration.get_member(str(row.get("bettor_id", "")))
+                    if winner is not None:
+                        winner.money += payout
+
+                print(
+                    f"Bets settled. Pool: {settlement['pool']} | "
+                    f"Winner bettor: {settlement['winner_bettor_id']} | "
+                    f"Payout: {settlement['winner_payout']}"
+                )
+
+            elif choice == "5":
+                race_id = input("Enter race ID: ").strip()
+                gambling.clear_bets(race_id)
+                print("Bets cleared for race.")
+
+            elif choice == "6":
+                confirm = input("Clear all bets? (y/N): ").strip().lower()
+                if confirm == "y":
+                    gambling.clear_bets()
+                    print("All bets cleared.")
+                else:
+                    print("Cancelled.")
+
+            else:
+                print("Invalid gambling option.")
+
+        except ValueError as exc:
+            print(f"Gambling action failed: {exc}")
+        except KeyError as exc:
+            print(f"Gambling action failed: {exc}")
+
+
 def run() -> None:
     actions: Dict[str, Callable[[], None]] = {
         "1": _register_member_flow,
@@ -619,10 +748,11 @@ def run() -> None:
         "9": _race_flow,
         "10": _results_flow,
         "11": _mission_flow,
+        "12": _gambling_flow,
     }
 
     while True:
-        print("\nStreetRace Manager - Integration Phase 6 (Registration + Crew + Inventory + Race + Results + Mission)")
+        print("\nStreetRace Manager - Integration Phase 7 (Registration + Crew + Inventory + Race + Results + Mission + Gambling)")
         print("1. Register member")
         print("2. List members")
         print("3. Get member by ID")
@@ -634,6 +764,7 @@ def run() -> None:
         print("9. Race management")
         print("10. Results management")
         print("11. Mission planning")
+        print("12. Gambling")
         print("0. Exit")
 
         choice = input("Choose an option: ").strip()
