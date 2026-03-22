@@ -4,12 +4,12 @@ import sys
 from pathlib import Path
 
 try:
-    from integration.code import crew, registration
+    from integration.code import crew, inventory, registration
 except ImportError:
     repo_root = Path(__file__).resolve().parents[2]
     if str(repo_root) not in sys.path:
         sys.path.insert(0, str(repo_root))
-    from integration.code import crew, registration
+    from integration.code import crew, inventory, registration
 
 
 def _prompt_non_empty(prompt: str) -> str:
@@ -123,6 +123,123 @@ def _view_member_skill_flow() -> None:
     print(f"Name: {member.name} | Role: {member.role} | Level: {crew.get_skill(member)}")
 
 
+def _inventory_flow() -> None:
+    while True:
+        print("\nInventory Management")
+        print("1. Set cash balance")
+        print("2. View cash balance")
+        print("3. Adjust cash (delta)")
+        print("4. Add car")
+        print("5. List cars")
+        print("6. Update car condition")
+        print("7. Add spare part")
+        print("8. Use spare part")
+        print("9. List spare parts")
+        print("10. Add tool")
+        print("11. Use tool")
+        print("12. List tools")
+        print("13. Clear inventory")
+        print("0. Back")
+
+        choice = input("Choose inventory option: ").strip()
+        if choice == "0":
+            return
+
+        try:
+            if choice == "1":
+                amount = int(input("Enter new cash balance: ").strip())
+                inventory.set_cash_balance(amount)
+                print(f"Cash balance set to {inventory.get_cash_balance()}")
+
+            elif choice == "2":
+                print(f"Cash balance: {inventory.get_cash_balance()}")
+
+            elif choice == "3":
+                delta = int(input("Enter cash delta (can be negative): ").strip())
+                new_balance = inventory.adjust_cash(delta)
+                print(f"Cash balance updated: {new_balance}")
+
+            elif choice == "4":
+                car_id = input("Enter car id: ").strip()
+                model = input("Enter model: ").strip()
+                condition = input("Enter condition (good/damaged/repairing/retired): ").strip() or "good"
+                inventory.add_car(car_id=car_id, model=model, condition=condition)
+                print("Car added.")
+
+            elif choice == "5":
+                cars = inventory.list_cars()
+                if not cars:
+                    print("No cars in inventory.")
+                else:
+                    print("Cars:")
+                    for idx, car in enumerate(cars, start=1):
+                        print(f"{idx}. ID: {car.id} | Model: {car.model} | Condition: {car.condition}")
+
+            elif choice == "6":
+                car_id = input("Enter car id: ").strip()
+                condition = input("Enter new condition (good/damaged/repairing/retired): ").strip()
+                inventory.update_car_condition(car_id, condition)
+                print("Car condition updated.")
+
+            elif choice == "7":
+                part_name = input("Enter spare part name: ").strip()
+                qty = int(input("Enter quantity: ").strip())
+                inventory.add_spare_part(part_name, qty)
+                print("Spare part added.")
+
+            elif choice == "8":
+                part_name = input("Enter spare part name: ").strip()
+                qty = int(input("Enter quantity to use: ").strip())
+                inventory.use_spare_part(part_name, qty)
+                print("Spare part usage recorded.")
+
+            elif choice == "9":
+                parts = inventory.list_spare_parts()
+                if not parts:
+                    print("No spare parts in inventory.")
+                else:
+                    print("Spare parts:")
+                    for name, qty in parts.items():
+                        print(f"- {name}: {qty}")
+
+            elif choice == "10":
+                tool_name = input("Enter tool name: ").strip()
+                qty = int(input("Enter quantity: ").strip())
+                inventory.add_tool(tool_name, qty)
+                print("Tool added.")
+
+            elif choice == "11":
+                tool_name = input("Enter tool name: ").strip()
+                qty = int(input("Enter quantity to use: ").strip())
+                inventory.use_tool(tool_name, qty)
+                print("Tool usage recorded.")
+
+            elif choice == "12":
+                tools = inventory.list_tools()
+                if not tools:
+                    print("No tools in inventory.")
+                else:
+                    print("Tools:")
+                    for name, qty in tools.items():
+                        print(f"- {name}: {qty}")
+
+            elif choice == "13":
+                confirm = input("Clear all inventory data? (y/N): ").strip().lower()
+                if confirm == "y":
+                    inventory.clear_inventory()
+                    print("Inventory cleared.")
+                else:
+                    print("Cancelled.")
+
+            else:
+                print("Invalid inventory option.")
+
+        except ValueError as exc:
+            print(f"Inventory action failed: {exc}")
+        except KeyError as exc:
+            print(f"Inventory action failed: {exc}")
+
+
 def run() -> None:
     actions: Dict[str, Callable[[], None]] = {
         "1": _register_member_flow,
@@ -132,10 +249,11 @@ def run() -> None:
         "5": _change_member_role_flow,
         "6": _change_member_skill_flow,
         "7": _view_member_skill_flow,
+        "8": _inventory_flow,
     }
 
     while True:
-        print("\nStreetRace Manager - Integration Phase 2 (Registration + Crew)")
+        print("\nStreetRace Manager - Integration Phase 3 (Registration + Crew + Inventory)")
         print("1. Register member")
         print("2. List members")
         print("3. Get member by ID")
@@ -143,6 +261,7 @@ def run() -> None:
         print("5. Change member role")
         print("6. Change member skill level")
         print("7. View member skill level")
+        print("8. Inventory management")
         print("0. Exit")
 
         choice = input("Choose an option: ").strip()
