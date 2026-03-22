@@ -1,10 +1,12 @@
 from typing import Dict, List, Optional
 
+from .models import Car
+
 
 _VALID_CONDITIONS = {"good", "damaged", "repairing", "retired"}
 
 _cash_balance: int = 0
-_cars: Dict[str, Dict[str, str]] = {}
+_cars: Dict[str, Car] = {}
 _spare_parts: Dict[str, int] = {}
 _tools: Dict[str, int] = {}
 
@@ -63,23 +65,20 @@ def add_car(car_id: str, model: str, condition: str = "good") -> None:
     model_name = _normalize_name(model, "model")
     if cid in _cars:
         raise ValueError(f"car already exists: {cid}")
-    _cars[cid] = {
-        "id": cid,
-        "model": model_name,
-        "condition": _normalize_condition(condition),
-    }
+    _cars[cid] = Car(
+        id=cid,
+        model=model_name,
+        condition=_normalize_condition(condition),
+    )
 
 
-def get_car(car_id: str) -> Optional[Dict[str, str]]:
+def get_car(car_id: str) -> Optional[Car]:
     cid = _normalize_name(car_id, "car_id")
-    car = _cars.get(cid)
-    if car is None:
-        return None
-    return dict(car)
+    return _cars.get(cid)
 
 
-def list_cars() -> List[Dict[str, str]]:
-    return [dict(car) for car in _cars.values()]
+def list_cars() -> List[Car]:
+    return list(_cars.values())
 
 
 def update_car_condition(car_id: str, condition: str) -> None:
@@ -87,7 +86,7 @@ def update_car_condition(car_id: str, condition: str) -> None:
     car = _cars.get(cid)
     if car is None:
         raise KeyError(f"car not found: {cid}")
-    car["condition"] = _normalize_condition(condition)
+    car.condition = _normalize_condition(condition)
 
 
 def add_spare_part(part_name: str, qty: int = 1) -> None:
