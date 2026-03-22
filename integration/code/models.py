@@ -1,5 +1,5 @@
-from dataclasses import dataclass, field
-from typing import Dict, Optional
+from dataclasses import dataclass
+from typing import Optional
 
 
 @dataclass
@@ -7,8 +7,8 @@ class CrewMember:
     id: str
     name: str
     role: str
-    # skill levels are stored as x/10, essentially a rating
-    skills: Dict[str, str] = field(default_factory=dict)
+    # One role-linked proficiency level from 0..10.
+    skill_level: int = 0
 
 
 @dataclass

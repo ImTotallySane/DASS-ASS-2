@@ -23,17 +23,15 @@ def change_role(member: CrewMember, new_role: str) -> None:
     member.role = normalize_role(new_role)
 
 
-def change_rating(member: CrewMember, skill: str, level: int) -> None:
-    # Set or update a member's skill rating as 'x/10'.
+def change_rating(member: CrewMember, level: int) -> None:
+    # Set or update the member's role-linked skill level (0..10).
     if not isinstance(level, int):
         raise ValueError("level must be an integer 0..10")
     if level < 0 or level > 10:
         raise ValueError("level must be between 0 and 10 inclusive")
-    if not skill or not isinstance(skill, str):
-        raise ValueError("skill name must be a non-empty string")
-    member.skills[skill] = f"{level}/10"
+    member.skill_level = level
 
 
-def get_skill(member: CrewMember, skill: str) -> Optional[str]:
-    """Return the rating string for a skill or None if not set."""
-    return member.skills.get(skill)
+def get_skill(member: CrewMember) -> str:
+    """Return the role-linked skill level as x/10."""
+    return f"{member.skill_level}/10"
