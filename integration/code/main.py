@@ -4,12 +4,12 @@ import sys
 from pathlib import Path
 
 try:
-    from integration.code import crew, inventory, race, registration
+    from integration.code import crew, inventory, race, registration, results
 except ImportError:
     repo_root = Path(__file__).resolve().parents[2]
     if str(repo_root) not in sys.path:
         sys.path.insert(0, str(repo_root))
-    from integration.code import crew, inventory, race, registration
+    from integration.code import crew, inventory, race, registration, results
 
 
 def _prompt_non_empty(prompt: str) -> str:
@@ -34,7 +34,7 @@ def _register_member_flow() -> None:
     member = registration.get_member(member_id)
     print("Registered successfully.")
     if member:
-        print(f"ID: {member.id} | Name: {member.name} | Role: {member.role}")
+        print(f"ID: {member.id} | Name: {member.name} | Role: {member.role} | Money: {member.money}")
 
 
 def _list_members_flow() -> None:
@@ -45,7 +45,7 @@ def _list_members_flow() -> None:
 
     print("Registered members:")
     for idx, m in enumerate(members, start=1):
-        print(f"{idx}. ID: {m.id} | Name: {m.name} | Role: {m.role}")
+        print(f"{idx}. ID: {m.id} | Name: {m.name} | Role: {m.role} | Money: {m.money}")
 
 
 def _get_member_flow() -> None:
@@ -54,7 +54,7 @@ def _get_member_flow() -> None:
     if member is None:
         print("Member not found.")
         return
-    print(f"Name: {member.name} | Role: {member.role}")
+    print(f"Name: {member.name} | Role: {member.role} | Money: {member.money}")
 
 
 def _clear_members_flow() -> None:
@@ -342,6 +342,127 @@ def _race_flow() -> None:
             print(f"Race action failed: {exc}")
 
 
+def _results_flow() -> None:
+    while True:
+        print("\nResults Management")
+        print("1. Record race results")
+        print("2. View race results")
+        print("3. List all recorded results")
+        print("4. Clear all results")
+        print("0. Back")
+
+        choice = input("Choose results option: ").strip()
+        if choice == "0":
+            return
+
+        try:
+            if choice == "1":
+                race_id = input("Enter race ID: ").strip()
+                race_data = race.get_race(race_id)
+                if race_data is None:
+                    print("Results failed: race not found.")
+                    continue
+
+                entries = race_data.get("entries", [])
+                if not entries:
+                    print("Results failed: race has no entries.")
+                    continue
+
+                # Prevent duplicate payout application for the same race.
+                if results.get_results(race_id) is not None:
+                    print("Results already recorded for this race.")
+                    continue
+
+                print("Current race entries:")
+                for idx, entry in enumerate(entries, start=1):
+                    print(f"{idx}. Driver: {entry.driver.name} ({entry.driver.id}) | Car: {entry.car.id}")
+
+                order_input = input("Enter finish order as comma-separated driver IDs: ").strip()
+                ordered_driver_ids = [x.strip() for x in order_input.split(",") if x.strip()]
+
+                if len(ordered_driver_ids) != len(entries):
+                    print("Results failed: finish order must include each race entry exactly once.")
+                    continue
+
+                id_to_entry = {entry.driver.id: entry for entry in entries}
+                if len(set(ordered_driver_ids)) != len(ordered_driver_ids):
+                    print("Results failed: duplicate driver IDs in finish order.")
+                    continue
+                if any(driver_id not in id_to_entry for driver_id in ordered_driver_ids):
+                    print("Results failed: finish order contains driver IDs not in race entries.")
+                    continue
+
+                ordered_entries = [id_to_entry[driver_id] for driver_id in ordered_driver_ids]
+                prize_pool = int(race_data.get("prize_pool", 0))
+
+                # Compute payouts first and ensure inventory can cover them.
+                ordered_driver_ids = [e.driver.id for e in ordered_entries]
+                payouts_map = results.calculate_payouts(ordered_driver_ids, prize_pool)
+                total_payout = sum(int(v or 0) for v in payouts_map.values())
+
+                if inventory.get_cash_balance() < total_payout:
+                    print("Results failed: inventory does not have enough cash to pay prizes.")
+                    continue
+
+                # Record results and credit each driver's personal balance.
+                rows = results.record_results(race_id=race_id, ordered_entries=ordered_entries, prize_pool=prize_pool)
+                for row in rows:
+                    member = registration.get_member(str(row.get("driver_id", "")))
+                    if member is not None:
+                        member.money += int(row.get("payout", 0) or 0)
+
+                # Business rule: deduct prize pool from inventory cash.
+                new_balance = inventory.adjust_cash(-total_payout)
+
+                race_data["status"] = "completed"
+                print("Results recorded.")
+                for row in rows:
+                    print(
+                        f"Pos {row['position']} | Driver: {row['driver_id']} | "
+                        f"Car: {row['car_id']} | Payout: {row['payout']}"
+                    )
+                print(f"Total payout applied to inventory cash: {total_payout}")
+                print(f"New cash balance: {new_balance}")
+
+            elif choice == "2":
+                race_id = input("Enter race ID: ").strip()
+                race_results = results.get_results(race_id)
+                if race_results is None:
+                    print("No results recorded for this race.")
+                    continue
+                print(f"Results for race {race_id}:")
+                for row in race_results:
+                    print(
+                        f"Pos {row['position']} | Driver: {row['driver_id']} | "
+                        f"Car: {row['car_id']} | Payout: {row['payout']}"
+                    )
+
+            elif choice == "3":
+                all_results = results.list_results()
+                if not all_results:
+                    print("No recorded results yet.")
+                    continue
+                print("Recorded results:")
+                for rid, rows in all_results.items():
+                    print(f"Race {rid}: {len(rows)} entries")
+
+            elif choice == "4":
+                confirm = input("Clear all results? (y/N): ").strip().lower()
+                if confirm == "y":
+                    results.clear_results()
+                    print("All results cleared.")
+                else:
+                    print("Cancelled.")
+
+            else:
+                print("Invalid results option.")
+
+        except ValueError as exc:
+            print(f"Results action failed: {exc}")
+        except KeyError as exc:
+            print(f"Results action failed: {exc}")
+
+
 def run() -> None:
     actions: Dict[str, Callable[[], None]] = {
         "1": _register_member_flow,
@@ -353,10 +474,11 @@ def run() -> None:
         "7": _view_member_skill_flow,
         "8": _inventory_flow,
         "9": _race_flow,
+        "10": _results_flow,
     }
 
     while True:
-        print("\nStreetRace Manager - Integration Phase 4 (Registration + Crew + Inventory + Race)")
+        print("\nStreetRace Manager - Integration Phase 5 (Registration + Crew + Inventory + Race + Results)")
         print("1. Register member")
         print("2. List members")
         print("3. Get member by ID")
@@ -366,6 +488,7 @@ def run() -> None:
         print("7. View member skill level")
         print("8. Inventory management")
         print("9. Race management")
+        print("10. Results management")
         print("0. Exit")
 
         choice = input("Choose an option: ").strip()

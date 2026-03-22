@@ -9,6 +9,8 @@ class CrewMember:
     role: str
     # One role-linked proficiency level from 0..10.
     skill_level: int = 0
+    # Personal cash balance for payout tracking.
+    money: int = 0
 
 
 @dataclass
