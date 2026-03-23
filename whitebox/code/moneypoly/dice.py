@@ -1,5 +1,12 @@
+"""Dice helpers for MoneyPoly.
+
+This module provides a small `Dice` class used to roll two dice,
+track consecutive doubles, and present roll descriptions for logging.
+"""
+
 import random
 from moneypoly.config import BOARD_SIZE
+
 
 class Dice:
     """Simulates a pair of six-sided dice with consecutive-doubles tracking."""
