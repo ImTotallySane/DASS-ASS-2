@@ -72,6 +72,13 @@ class Game:
 
         self._move_and_resolve(player, roll)
 
+        # If the player was eliminated during resolution, do not advance the
+        # index (the next player now occupies the same index). Still count
+        # this as a completed turn.
+        if player not in self.players:
+            self.turn_number += 1
+            return
+
         # Rolling doubles earns an extra turn
         if self.dice.is_doubles():
             print(f"  Doubles! {player.name} rolls again.")
