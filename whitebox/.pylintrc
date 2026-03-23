@@ -1,0 +1,4 @@
+[MASTER]
+# Ensure local package imports like `moneypoly.*` resolve when running pylint
+# from the `whitebox` directory.
+init-hook=import sys; sys.path.insert(0, 'code')
