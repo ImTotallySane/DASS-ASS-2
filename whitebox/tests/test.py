@@ -88,7 +88,10 @@ def test_property_rent_mortgage_unmortgage_and_availability():
 	assert prop.mortgage() == 0
 
 	assert prop.unmortgage() == 55
-	assert prop.is_mortgaged is False
+	# Error 17 behavior: Property.unmortgage() returns cost only; game flow
+	# clears the mortgage flag after successful payment.
+	assert prop.is_mortgaged is True
+	prop.is_mortgaged = False
 	assert prop.unmortgage() == 0
 
 	fresh = Property("Fresh", 2, 120, 12)
