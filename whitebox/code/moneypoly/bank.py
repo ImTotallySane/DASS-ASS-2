@@ -1,4 +1,3 @@
-import math
 from moneypoly.config import BANK_STARTING_FUNDS
 
 
