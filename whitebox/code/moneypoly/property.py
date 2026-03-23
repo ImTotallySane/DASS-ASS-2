@@ -53,9 +53,10 @@ class Property:
         """
         if not self.is_mortgaged:
             return 0
-        cost = int(self.mortgage_value * 1.1)
-        self.is_mortgaged = False
-        return cost
+        # Return the redemption cost without changing state; the caller
+        # (Game.unmortgage_property) is responsible for applying payment
+        # and updating `is_mortgaged` only after successful payment.
+        return int(self.mortgage_value * 1.1)
 
     def is_available(self):
         """Return True if this property can be purchased (unowned, not mortgaged)."""
@@ -64,7 +65,6 @@ class Property:
     def __repr__(self):
         owner_name = self.owner.name if self.owner else "unowned"
         return f"Property({self.name!r}, pos={self.position}, owner={owner_name!r})"
-
 
 class PropertyGroup:
     """Group of properties that share a color set and ownership rules."""
