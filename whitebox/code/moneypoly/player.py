@@ -1,4 +1,9 @@
-import sys
+"""Player model for MoneyPoly.
+
+Defines the :class:`Player` used by the game loop. Keeps track of
+the player's balance, board position, owned properties, and jail
+state.
+"""
 from moneypoly.config import STARTING_BALANCE, BOARD_SIZE, GO_SALARY, JAIL_POSITION
 
 
@@ -10,9 +15,8 @@ class Player:
         self.balance = balance
         self.position = 0
         self.properties = []
-        self.in_jail = False
-        self.jail_turns = 0
-        self.get_out_of_jail_cards = 0
+        # group jail-related state to reduce instance attribute count
+        self.jail = {"in": False, "turns": 0, "free_cards": 0}
         self.is_eliminated = False
 
 
@@ -42,7 +46,6 @@ class Player:
         Awards the Go salary if the player passes or lands on Go.
         Returns the new board position.
         """
-        old_position = self.position
         self.position = (self.position + steps) % BOARD_SIZE
 
         if self.position == 0:
@@ -54,8 +57,8 @@ class Player:
     def go_to_jail(self):
         """Send this player directly to the Jail square."""
         self.position = JAIL_POSITION
-        self.in_jail = True
-        self.jail_turns = 0
+        self.jail["in"] = True
+        self.jail["turns"] = 0
 
 
     def add_property(self, prop):
@@ -82,6 +85,33 @@ class Player:
             f"props={len(self.properties)}"
             f"{jail_tag}"
         )
+
+    @property
+    def in_jail(self):
+        """Whether this player is currently in jail."""
+        return self.jail.get("in", False)
+
+    @in_jail.setter
+    def in_jail(self, value):
+        self.jail["in"] = bool(value)
+
+    @property
+    def jail_turns(self):
+        """How many turns this player has remained in jail."""
+        return self.jail.get("turns", 0)
+
+    @jail_turns.setter
+    def jail_turns(self, value):
+        self.jail["turns"] = int(value)
+
+    @property
+    def get_out_of_jail_cards(self):
+        """Backward-compatible accessor for jail free cards."""
+        return self.jail.get("free_cards", 0)
+
+    @get_out_of_jail_cards.setter
+    def get_out_of_jail_cards(self, value):
+        self.jail["free_cards"] = value
 
     def __repr__(self):
         return f"Player({self.name!r}, balance={self.balance}, pos={self.position})"
