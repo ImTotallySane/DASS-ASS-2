@@ -370,7 +370,8 @@ class Game:
     def _card_move_to(self, player, value, _card):
         old_pos = player.position
         player.position = value
-        if value < old_pos:
+        # Collect GO salary when moving past Go or being sent to Go explicitly
+        if value == 0 or value < old_pos:
             player.add_money(GO_SALARY)
             print(f"  {player.name} passed Go and collected ${GO_SALARY}.")
         tile = self.board.get_tile_type(value)
