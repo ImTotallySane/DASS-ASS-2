@@ -1,3 +1,10 @@
+"""Core game engine for MoneyPoly.
+
+This module defines the `Game` class which manages game state, player
+rotation, turn execution and resolution of board events. It orchestrates
+interactions between `Player`, `Board`, `Bank`, card decks and the UI.
+"""
+
 import os
 
 from moneypoly.config import (
