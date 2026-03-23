@@ -306,52 +306,20 @@ class Game:
             self._move_and_resolve(player, roll)
 
     def _apply_card(self, player, card):
-        """Apply the effect of a drawn Chance or Community Chest card."""
+        """Apply the effect of a drawn Chance or Community Chest card.
+
+        Dispatch card actions to dedicated handler methods to reduce
+        branching complexity (pylint R0912).
+        """
         if card is None:
             return
-        print(f"  Card drawn: \"{card['description']}\"")
-        action = card["action"]
-        value = card["value"]
+        print(f"  Card drawn: \"{card.get('description')}\"")
+        action = card.get("action")
+        value = card.get("value")
 
-        if action == "collect":
-            amount = self.bank.pay_out(value)
-            player.add_money(amount)
-
-        elif action == "pay":
-            player.deduct_money(value)
-            self.bank.collect(value)
-
-        elif action == "jail":
-            player.go_to_jail()
-            print(f"  {player.name} has been sent to Jail!")
-
-        elif action == "jail_free":
-            player.get_out_of_jail_cards += 1
-            print(f"  {player.name} now holds a Get Out of Jail Free card.")
-
-        elif action == "move_to":
-            old_pos = player.position
-            player.position = value
-            if value < old_pos:
-                player.add_money(GO_SALARY)
-                print(f"  {player.name} passed Go and collected ${GO_SALARY}.")
-            tile = self.board.get_tile_type(value)
-            if tile == "property":
-                prop = self.board.get_property_at(value)
-                if prop:
-                    self._handle_property_tile(player, prop)
-
-        elif action == "birthday":
-            for other in self.players:
-                if other != player and other.balance >= value:
-                    other.deduct_money(value)
-                    player.add_money(value)
-
-        elif action == "collect_from_all":
-            for other in self.players:
-                if other != player and other.balance >= value:
-                    other.deduct_money(value)
-                    player.add_money(value)
+        handler = getattr(self, f"_card_{action}", None)
+        if handler is not None:
+            handler(player, value, card)
 
 
     def _check_bankruptcy(self, player):
@@ -368,6 +336,46 @@ class Game:
                 self.players.remove(player)
             if self.current_index >= len(self.players):
                 self.current_index = 0
+
+    def _card_collect(self, player, value, _card):
+        amount = self.bank.pay_out(value)
+        player.add_money(amount)
+
+    def _card_pay(self, player, value, _card):
+        player.deduct_money(value)
+        self.bank.collect(value)
+
+    def _card_jail(self, player, _value, _card):
+        player.go_to_jail()
+        print(f"  {player.name} has been sent to Jail!")
+
+    def _card_jail_free(self, player, _value, _card):
+        player.get_out_of_jail_cards += 1
+        print(f"  {player.name} now holds a Get Out of Jail Free card.")
+
+    def _card_move_to(self, player, value, _card):
+        old_pos = player.position
+        player.position = value
+        if value < old_pos:
+            player.add_money(GO_SALARY)
+            print(f"  {player.name} passed Go and collected ${GO_SALARY}.")
+        tile = self.board.get_tile_type(value)
+        if tile == "property":
+            prop = self.board.get_property_at(value)
+            if prop:
+                self._handle_property_tile(player, prop)
+
+    def _card_birthday(self, player, value, _card):
+        for other in self.players:
+            if other != player and other.balance >= value:
+                other.deduct_money(value)
+                player.add_money(value)
+
+    def _card_collect_from_all(self, player, value, _card):
+        for other in self.players:
+            if other != player and other.balance >= value:
+                other.deduct_money(value)
+                player.add_money(value)
 
     def find_winner(self):
         """Return the player with the highest net worth."""
