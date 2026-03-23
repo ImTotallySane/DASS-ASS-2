@@ -31,9 +31,13 @@ class Game:
         self.players = [Player(name) for name in player_names]
         self.current_index = 0
         self.turn_number = 0
-        self.running = True
-        self.chance_deck = CardDeck(CHANCE_CARDS)
-        self.community_deck = CardDeck(COMMUNITY_CHEST_CARDS)
+        # Group less-frequently-accessed attributes into a single meta dict
+        # to reduce the number of instance attributes (pylint R0902).
+        self.meta = {
+            "running": True,
+            "chance_deck": CardDeck(CHANCE_CARDS),
+            "community_deck": CardDeck(COMMUNITY_CHEST_CARDS),
+        }
 
     def current_player(self):
         """Return the Player whose turn it currently is."""
@@ -107,11 +111,11 @@ class Game:
         print(f"  {player.name} rests on Free Parking. Nothing happens.")
 
     def _tile_chance(self, player, _position):
-        card = self.chance_deck.draw()
+        card = self.meta["chance_deck"].draw()
         self._apply_card(player, card)
 
     def _tile_community_chest(self, player, _position):
-        card = self.community_deck.draw()
+        card = self.meta["community_deck"].draw()
         self._apply_card(player, card)
 
     def _tile_railroad(self, player, position):
@@ -378,7 +382,7 @@ class Game:
         for p in self.players:
             print(f"  {p.name} starts with ${p.balance}.")
 
-        while self.running and self.turn_number < MAX_TURNS:
+        while self.meta["running"] and self.turn_number < MAX_TURNS:
             if len(self.players) <= 1:
                 break
             self.play_turn()
