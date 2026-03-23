@@ -8,6 +8,14 @@ from moneypoly.config import BANK_STARTING_FUNDS
 
 
 class Bank:
+    """Game bank: tracks cash reserves, issued loans and collections.
+
+    The Bank stores the current funds, a list of loans issued and a running
+    total of collected funds. It exposes methods to collect and pay out
+    amounts, issue emergency loans to players, and print a simple summary
+    of the bank state.
+    """
+
     def __init__(self):
         self._funds = BANK_STARTING_FUNDS
         self._loans_issued = []
