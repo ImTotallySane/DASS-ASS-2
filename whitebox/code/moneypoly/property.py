@@ -53,10 +53,9 @@ class Property:
         """
         if not self.is_mortgaged:
             return 0
-        # Return the redemption cost without changing state; the caller
-        # (Game.unmortgage_property) is responsible for applying payment
-        # and updating `is_mortgaged` only after successful payment.
-        return int(self.mortgage_value * 1.1)
+        cost = int(self.mortgage_value * 1.1)
+        self.is_mortgaged = False
+        return cost
 
     def is_available(self):
         """Return True if this property can be purchased (unowned, not mortgaged)."""
@@ -89,10 +88,11 @@ class PropertyGroup:
 
     def get_owner_counts(self):
         """Return a dict mapping each owner to how many properties they hold in this group."""
+        # Count each distinct owner once for this group's summary view.
         counts = {}
         for prop in self.properties:
-            if prop.owner is not None:
-                counts[prop.owner] = counts.get(prop.owner, 0) + 1
+            if prop.owner is not None and prop.owner not in counts:
+                counts[prop.owner] = 1
         return counts
 
     def size(self):
