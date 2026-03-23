@@ -1,3 +1,9 @@
+"""Entry point for the MoneyPoly whitebox example.
+
+This module provides a simple command-line launcher that reads player
+names, constructs a `Game`, and starts the game loop.
+"""
+
 from moneypoly.game import Game
 
 
