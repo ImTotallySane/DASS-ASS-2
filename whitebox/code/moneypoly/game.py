@@ -150,6 +150,11 @@ class Game:
         Purchase `prop` on behalf of `player`.
         Returns True on success, False if the player cannot afford it.
         """
+        # Property must be available to purchase: unowned and not mortgaged
+        if prop.owner is not None or prop.is_mortgaged:
+            print(f"  {prop.name} is not available for purchase.")
+            return False
+
         if player.balance < prop.price:
             print(f"  {player.name} cannot afford {prop.name} (${prop.price}).")
             return False
