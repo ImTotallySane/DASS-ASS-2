@@ -1,3 +1,9 @@
+"""Bank module for MoneyPoly.
+
+Provides the Bank class which manages the game's cash reserves, loans,
+and simple financial operations used by the game logic and tests.
+"""
+
 from moneypoly.config import BANK_STARTING_FUNDS
 
 
