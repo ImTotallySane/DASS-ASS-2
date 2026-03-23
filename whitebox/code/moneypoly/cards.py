@@ -1,3 +1,10 @@
+"""Chance and Community Chest card definitions and helper deck class.
+
+This module defines the card tables used by MoneyPoly and a small
+`CardDeck` helper that models a cyclic deck with draw/peek/reshuffle
+operations for use by the game.
+"""
+
 import random
 
 CHANCE_CARDS = [
