@@ -7,7 +7,7 @@ import requests
 
 
 BASE_URL = os.getenv("QUICKCART_BASE_URL", "http://localhost:8080/api/v1").rstrip("/")
-ROLL_NUMBER = os.getenv("QUICKCART_ROLL", "2024001")
+ROLL_NUMBER = os.getenv("QUICKCART_ROLL", "2024101023")
 TIMEOUT = float(os.getenv("QUICKCART_TIMEOUT", "15"))
 
 
