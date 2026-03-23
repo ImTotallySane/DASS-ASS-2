@@ -5,7 +5,6 @@ track consecutive doubles, and present roll descriptions for logging.
 """
 
 import random
-from moneypoly.config import BOARD_SIZE
 
 
 class Dice:
