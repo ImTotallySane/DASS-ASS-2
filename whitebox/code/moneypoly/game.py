@@ -230,6 +230,7 @@ class Game:
         prop.owner = buyer
         seller.remove_property(prop)
         buyer.add_property(prop)
+        seller.add_money(cash_amount)
         print(
             f"  Trade complete: {seller.name} sold {prop.name} "
             f"to {buyer.name} for ${cash_amount}."
