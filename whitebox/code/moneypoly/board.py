@@ -1,3 +1,10 @@
+"""Board representation for MoneyPoly.
+
+This module defines the `Board` class which constructs property groups,
+the list of purchasable properties, and helper methods for querying the
+type of tile at a given board position.
+"""
+
 from moneypoly.property import Property, PropertyGroup
 from moneypoly.config import (
     JAIL_POSITION,
