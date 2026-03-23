@@ -1,3 +1,10 @@
+"""Configuration constants used across the MoneyPoly modules.
+
+This module centralises game constants such as starting balances, board
+positions, tax amounts and other tunable parameters used by the game
+implementation and tests.
+"""
+
 STARTING_BALANCE = 1500
 GO_SALARY = 200
 BOARD_SIZE = 40
